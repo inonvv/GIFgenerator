@@ -1,7 +1,11 @@
 # pyinstaller --clean gifgen.spec
-# Produces dist/GIFGenerator.exe — a single-file Windows GUI bundle with embedded ffmpeg + yt-dlp.
+# Produces dist/GIFGenerator.exe — a single-file Windows GUI bundle.
+
+from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
+
+ctk_datas = collect_data_files('customtkinter')
 
 a = Analysis(
     ['app.py'],
@@ -10,7 +14,7 @@ a = Analysis(
     datas=[
         ('vendor/ffmpeg.exe', 'vendor'),
         ('vendor/yt-dlp.exe', 'vendor'),
-    ],
+    ] + ctk_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

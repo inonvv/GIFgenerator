@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Tkinter GUI for GIFgenerator. Entry point for the bundled .exe."""
+"""Modern GUI for GIFgenerator. Entry point for the bundled .exe."""
 
 import os
 import re
 import subprocess
 import sys
 import threading
-import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 
-from gifgen import make_gif
+import customtkinter as ctk
+
+from gifgen import make_clip
 
 
 def vendor_path(name: str):
@@ -59,47 +60,99 @@ def try_update_ytdlp_async(ytdlp: str) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
-class App:
-    def __init__(self, root: tk.Tk) -> None:
-        self.root = root
-        root.title("GIF Generator")
-        root.geometry("520x320")
-        root.resizable(False, False)
+class App(ctk.CTk):
+    def __init__(self) -> None:
+        super().__init__()
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+
+        self.title("GIF Generator")
+        self.geometry("580x560")
+        self.resizable(False, False)
 
         self.ffmpeg = vendor_path("ffmpeg.exe")
         self.ytdlp = vendor_path("yt-dlp.exe")
         if self.ytdlp:
             try_update_ytdlp_async(self.ytdlp)
 
-        frm = ttk.Frame(root, padding=16)
-        frm.pack(fill="both", expand=True)
+        self._build_ui()
+        self.last_outputs = None
 
-        self.url_var = tk.StringVar()
-        self.start_var = tk.StringVar(value="0:00")
-        self.duration_var = tk.StringVar(value="4")
-        self.name_var = tk.StringVar()
+    def _build_ui(self) -> None:
+        ctk.CTkLabel(
+            self, text="GIF Generator",
+            font=ctk.CTkFont(size=26, weight="bold"),
+        ).pack(pady=(24, 4))
 
-        self._row(frm, 0, "YouTube URL:", self.url_var, width=50)
-        self._row(frm, 1, "Start (e.g. 1:23):", self.start_var, width=20)
-        self._row(frm, 2, "Duration (seconds):", self.duration_var, width=20)
-        self._row(frm, 3, "Name:", self.name_var, width=30)
+        ctk.CTkLabel(
+            self,
+            text="Cut a slice of any online video into a sharable GIF + MP4",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray40", "gray60"),
+        ).pack(pady=(0, 18))
 
-        self.make_btn = ttk.Button(frm, text="Make GIF", command=self.on_make_clicked)
-        self.make_btn.grid(row=4, column=0, columnspan=2, pady=(16, 8), sticky="ew")
+        form = ctk.CTkFrame(self, corner_radius=12)
+        form.pack(padx=24, fill="x")
 
-        self.status_var = tk.StringVar(value="ready.")
-        ttk.Label(frm, textvariable=self.status_var, foreground="#555").grid(
-            row=5, column=0, columnspan=2, sticky="w"
+        self.url_var = ctk.StringVar()
+        self.start_var = ctk.StringVar(value="0:00")
+        self.duration_var = ctk.StringVar(value="4")
+        self.name_var = ctk.StringVar()
+        self.quality_var = ctk.StringVar(value="HD (720p, 24fps)")
+
+        self._field(form, "YouTube URL", self.url_var, row=0, colspan=2, placeholder="https://www.youtube.com/watch?v=...")
+
+        self._field(form, "Start", self.start_var, row=2, col=0, placeholder="e.g. 1:23")
+        self._field(form, "Duration (seconds)", self.duration_var, row=2, col=1, placeholder="e.g. 4")
+
+        self._field(form, "Name", self.name_var, row=4, colspan=2, placeholder="e.g. dog dancing")
+
+        ctk.CTkLabel(form, text="Quality", font=ctk.CTkFont(size=12)).grid(
+            row=6, column=0, sticky="w", padx=16, pady=(12, 0)
         )
+        ctk.CTkOptionMenu(
+            form,
+            values=["Standard (480p, 15fps)", "HD (720p, 24fps)"],
+            variable=self.quality_var,
+            width=240,
+        ).grid(row=7, column=0, columnspan=2, sticky="w", padx=16, pady=(2, 14))
 
-        self.open_btn = ttk.Button(frm, text="Open output folder", command=self.open_output, state="disabled")
-        self.open_btn.grid(row=6, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+        self.make_btn = ctk.CTkButton(
+            self, text="Make GIF + MP4",
+            height=46,
+            font=ctk.CTkFont(size=15, weight="bold"),
+            corner_radius=10,
+            command=self.on_make_clicked,
+        )
+        self.make_btn.pack(pady=(20, 6), padx=24, fill="x")
 
-        self.last_path = None
+        self.status = ctk.CTkLabel(self, text="Ready.", font=ctk.CTkFont(size=12))
+        self.status.pack(pady=(8, 0))
 
-    def _row(self, parent, r, label, var, width=30):
-        ttk.Label(parent, text=label).grid(row=r, column=0, sticky="w", pady=4)
-        ttk.Entry(parent, textvariable=var, width=width).grid(row=r, column=1, sticky="w", pady=4)
+        self.outputs_label = ctk.CTkLabel(
+            self, text="", font=ctk.CTkFont(size=10),
+            text_color=("gray35", "gray65"), justify="center",
+        )
+        self.outputs_label.pack(pady=(2, 0))
+
+        self.open_btn = ctk.CTkButton(
+            self, text="Open output folder",
+            fg_color="transparent",
+            border_width=1,
+            corner_radius=10,
+            state="disabled",
+            command=self.open_output,
+        )
+        self.open_btn.pack(pady=(12, 20), padx=24, fill="x")
+
+    def _field(self, parent, label, var, row, col=0, colspan=1, placeholder=""):
+        ctk.CTkLabel(parent, text=label, font=ctk.CTkFont(size=12)).grid(
+            row=row, column=col, columnspan=colspan, sticky="w", padx=16, pady=(12, 0)
+        )
+        entry = ctk.CTkEntry(parent, textvariable=var, placeholder_text=placeholder, height=34)
+        entry.grid(row=row + 1, column=col, columnspan=colspan, sticky="ew", padx=16, pady=(2, 0))
+        parent.grid_columnconfigure(col, weight=1)
+        return entry
 
     def on_make_clicked(self) -> None:
         url = self.url_var.get().strip()
@@ -121,53 +174,62 @@ class App:
             messagebox.showerror("Bad duration", "Duration must be a positive number of seconds.")
             return
         if not name:
-            messagebox.showerror("Missing input", "Please enter a name for the GIF.")
+            messagebox.showerror("Missing input", "Please enter a name.")
             return
 
-        out_path = output_dir() / f"{sanitize_name(name)}.gif"
-        self.make_btn.configure(state="disabled")
+        if "720" in self.quality_var.get():
+            fps, width = 24, 720
+        else:
+            fps, width = 15, 480
+
+        out_base = output_dir() / f"{sanitize_name(name)}.gif"
+        self.make_btn.configure(state="disabled", text="Working…")
         self.open_btn.configure(state="disabled")
-        self.status_var.set("starting…")
+        self.outputs_label.configure(text="")
+        self.status.configure(text="Starting…")
         threading.Thread(
-            target=self._run_job, args=(url, start, duration, out_path), daemon=True
+            target=self._run_job,
+            args=(url, start, duration, out_base, fps, width),
+            daemon=True,
         ).start()
 
-    def _run_job(self, url: str, start: str, duration: float, out_path: Path) -> None:
+    def _run_job(self, url: str, start: str, duration: float, out_base: Path, fps: int, width: int) -> None:
         try:
-            make_gif(
-                url=url,
-                start=start,
-                duration=duration,
-                out=str(out_path),
-                ffmpeg=self.ffmpeg,
-                ytdlp=self.ytdlp,
-                on_status=lambda s: self.root.after(0, self.status_var.set, f"{s}…"),
+            gif_path, mp4_path = make_clip(
+                url=url, start=start, duration=duration, out=str(out_base),
+                fps=fps, width=width,
+                ffmpeg=self.ffmpeg, ytdlp=self.ytdlp,
+                on_status=lambda s: self.after(0, self.status.configure, {"text": f"{s}…"}),
             )
         except subprocess.CalledProcessError as e:
-            self.root.after(0, self._on_failure, f"yt-dlp/ffmpeg failed (exit {e.returncode}). Check the URL.")
+            self.after(0, self._on_failure, f"yt-dlp/ffmpeg failed (exit {e.returncode}). Check the URL.")
             return
         except FileNotFoundError as e:
-            self.root.after(0, self._on_failure, f"Required tool not found: {e}")
+            self.after(0, self._on_failure, f"Required tool not found: {e}")
             return
         except Exception as e:
-            self.root.after(0, self._on_failure, f"Unexpected error: {e}")
+            self.after(0, self._on_failure, f"Unexpected error: {e}")
             return
 
-        self.last_path = out_path
-        self.root.after(0, self._on_success, out_path)
+        self.last_outputs = (Path(gif_path), Path(mp4_path))
+        self.after(0, self._on_success)
 
-    def _on_success(self, out_path: Path) -> None:
-        self.status_var.set(f"done — {out_path.name}")
-        self.make_btn.configure(state="normal")
+    def _on_success(self) -> None:
+        gif_path, mp4_path = self.last_outputs
+        self.status.configure(text="Done.")
+        self.outputs_label.configure(
+            text=f"GIF: {gif_path.name}\nMP4: {mp4_path.name}  (use this for WhatsApp/Telegram/Discord)",
+        )
+        self.make_btn.configure(state="normal", text="Make GIF + MP4")
         self.open_btn.configure(state="normal")
 
     def _on_failure(self, msg: str) -> None:
-        self.status_var.set("failed.")
-        self.make_btn.configure(state="normal")
+        self.status.configure(text="Failed.")
+        self.make_btn.configure(state="normal", text="Make GIF + MP4")
         messagebox.showerror("Failed", msg)
 
     def open_output(self) -> None:
-        folder = self.last_path.parent if self.last_path else output_dir()
+        folder = self.last_outputs[0].parent if self.last_outputs else output_dir()
         try:
             os.startfile(folder)
         except AttributeError:
@@ -175,9 +237,7 @@ class App:
 
 
 def main() -> None:
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
+    App().mainloop()
 
 
 if __name__ == "__main__":
