@@ -11,7 +11,7 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from gifgen import make_clip
+from gifgen import make_gif
 
 
 def vendor_path(name: str):
@@ -86,7 +86,7 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(
             self,
-            text="Cut a slice of any online video into a sharable GIF + MP4",
+            text="Cut a slice of any online video into a GIF",
             font=ctk.CTkFont(size=12),
             text_color=("gray40", "gray60"),
         ).pack(pady=(0, 18))
@@ -118,7 +118,7 @@ class App(ctk.CTk):
         ).grid(row=7, column=0, columnspan=2, sticky="w", padx=16, pady=(2, 14))
 
         self.make_btn = ctk.CTkButton(
-            self, text="Make GIF + MP4",
+            self, text="Make GIF",
             height=46,
             font=ctk.CTkFont(size=15, weight="bold"),
             corner_radius=10,
@@ -182,21 +182,21 @@ class App(ctk.CTk):
         else:
             fps, width = 15, 480
 
-        out_base = output_dir() / f"{sanitize_name(name)}.gif"
+        out_path = output_dir() / f"{sanitize_name(name)}.gif"
         self.make_btn.configure(state="disabled", text="Working…")
         self.open_btn.configure(state="disabled")
         self.outputs_label.configure(text="")
         self.status.configure(text="Starting…")
         threading.Thread(
             target=self._run_job,
-            args=(url, start, duration, out_base, fps, width),
+            args=(url, start, duration, out_path, fps, width),
             daemon=True,
         ).start()
 
-    def _run_job(self, url: str, start: str, duration: float, out_base: Path, fps: int, width: int) -> None:
+    def _run_job(self, url: str, start: str, duration: float, out_path: Path, fps: int, width: int) -> None:
         try:
-            gif_path, mp4_path = make_clip(
-                url=url, start=start, duration=duration, out=str(out_base),
+            gif_path = make_gif(
+                url=url, start=start, duration=duration, out=str(out_path),
                 fps=fps, width=width,
                 ffmpeg=self.ffmpeg, ytdlp=self.ytdlp,
                 on_status=lambda s: self.after(0, self.status.configure, {"text": f"{s}…"}),
@@ -211,25 +211,22 @@ class App(ctk.CTk):
             self.after(0, self._on_failure, f"Unexpected error: {e}")
             return
 
-        self.last_outputs = (Path(gif_path), Path(mp4_path))
+        self.last_outputs = Path(gif_path)
         self.after(0, self._on_success)
 
     def _on_success(self) -> None:
-        gif_path, mp4_path = self.last_outputs
         self.status.configure(text="Done.")
-        self.outputs_label.configure(
-            text=f"GIF: {gif_path.name}\nMP4: {mp4_path.name}  (use this for WhatsApp/Telegram/Discord)",
-        )
-        self.make_btn.configure(state="normal", text="Make GIF + MP4")
+        self.outputs_label.configure(text=f"Saved: {self.last_outputs.name}")
+        self.make_btn.configure(state="normal", text="Make GIF")
         self.open_btn.configure(state="normal")
 
     def _on_failure(self, msg: str) -> None:
         self.status.configure(text="Failed.")
-        self.make_btn.configure(state="normal", text="Make GIF + MP4")
+        self.make_btn.configure(state="normal", text="Make GIF")
         messagebox.showerror("Failed", msg)
 
     def open_output(self) -> None:
-        folder = self.last_outputs[0].parent if self.last_outputs else output_dir()
+        folder = self.last_outputs.parent if self.last_outputs else output_dir()
         try:
             os.startfile(folder)
         except AttributeError:
