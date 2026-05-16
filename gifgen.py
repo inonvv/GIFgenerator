@@ -113,8 +113,10 @@ def make_clip(
             os.makedirs(out_dir, exist_ok=True)
         status("encoding mp4")
         to_mp4(src, start, duration, out_mp4, fps, width, ffmpeg=ffmpeg)
+        # Encode GIF from the clean small MP4 we just produced — avoids re-seeking the
+        # full source and dodges AV1 decoder + palettegen memory blow-up on long videos.
         status("encoding gif")
-        to_gif(src, start, duration, out_gif, fps, width, ffmpeg=ffmpeg)
+        to_gif(out_mp4, "0", duration, out_gif, fps, width, ffmpeg=ffmpeg)
     status("done")
     return out_gif, out_mp4
 
