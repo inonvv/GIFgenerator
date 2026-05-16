@@ -2,16 +2,58 @@
 
 Make a GIF from a slice of an online video. YouTube, Twitch, Vimeo, Twitter — anything yt-dlp supports.
 
-## For most people: download the app
+## For non-coders: download and run (Windows)
 
-1. Go to the [Releases page](../../releases/latest) and download **`GIFGenerator.exe`**.
-2. Double-click it.
-3. **If Windows shows a blue "Windows protected your PC" screen:** click **More info** → **Run anyway**. (Windows shows this for any app that isn't code-signed. The app is open source — you can read every line in this repo.)
-4. Paste a YouTube URL, set the start time (e.g. `1:23`), duration in seconds (e.g. `4`), and a name. Click **Make GIF**. The GIF lands in `Desktop\GIFGenerator\`.
+You don't need Python, the command line, or any installation. Just one file.
 
-No Python, no ffmpeg install, no command line — everything is bundled inside the .exe.
+### Step 1 — Download the app
 
-> Sending the GIF? Email works perfectly. WhatsApp sometimes shows it as a static first frame — drag it into WhatsApp Web as a Document, or send as the produced file via email/Telegram which display animated GIFs natively.
+1. Click the [**Releases**](../../releases/latest) link.
+2. Under the latest release you'll see a file called **`GIFGenerator.exe`**. Click it to download.
+3. Wait for it to finish (~100 MB).
+
+> Where did it go? Probably your `Downloads` folder. You can move it to your Desktop or anywhere you like.
+
+### Step 2 — Open the app
+
+1. **Double-click `GIFGenerator.exe`** in File Explorer.
+2. The first time you run it, Windows may show a blue screen titled **"Windows protected your PC"**. This is normal — Windows shows it for any app that hasn't paid for a code-signing certificate. It does **not** mean the app is unsafe.
+   - Click the small text **"More info"**.
+   - A new button appears: **"Run anyway"**. Click it.
+3. After a few seconds, a small window opens. You only have to do the "Run anyway" step **once**.
+
+> Still blocked? Right-click `GIFGenerator.exe` → **Properties** → at the bottom check **"Unblock"** → click **OK**. Then double-click again.
+
+### Step 3 — Make a GIF
+
+In the window, fill in the four fields:
+
+| Field | What to put | Example |
+|---|---|---|
+| **YouTube URL** | The full link to the video | `https://www.youtube.com/watch?v=...` |
+| **Start** | Where the GIF should begin | `1:23` (1 minute 23 seconds) |
+| **Duration (seconds)** | How long the GIF should be | `4` |
+| **Name** | A short name for the file | `dog dancing` |
+
+Click **Make GIF**. Wait 10–60 seconds. When the status says **"done"**, click **Open output folder** to find your GIF.
+
+### Step 4 — Where is the GIF?
+
+All your GIFs are saved to: **`Desktop\GIFGenerator\<name>.gif`**
+
+### Step 5 — Send it
+
+- **Email** works perfectly: just attach the `.gif` file. Recipients see it animated.
+- **Telegram, Discord, Signal**: drag the file in. Plays automatically.
+- **WhatsApp** is finicky — it sometimes shows GIFs as a still photo of the first frame. Workarounds: use WhatsApp Web and attach as **Document** (paperclip icon → Document), or just send via email.
+
+### Troubleshooting
+
+- **"Could not find file" / weird error window** — close the app, re-open it, try a different YouTube URL first to see if the issue is the URL or the app.
+- **"Make GIF" button does nothing** — check the status text at the bottom of the window. If it stays on "downloading…" for over 2 minutes, your internet might be slow or the video might be unusually long.
+- **Need a different start time format** — `1:23` works, `0:01:23` works, raw seconds (`83`) also works.
+
+> The app is open source — every line of code is in this repo. No tracking, no ads, no account needed.
 
 ## For developers / CLI users
 
