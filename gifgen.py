@@ -33,7 +33,7 @@ def _ytdlp_cmd(ytdlp: Optional[str]) -> list:
 def download_low_res(page_url: str, tmpdir: str, ytdlp: Optional[str] = None, ffmpeg: Optional[str] = None) -> str:
     out_template = os.path.join(tmpdir, "src.%(ext)s")
     cmd = _ytdlp_cmd(ytdlp) + [
-        "-f", "wv*[ext=mp4][height<=360]/wv*[height<=360]/w",
+        "-f", "bv*[ext=mp4][height<=720]/bv*[height<=720]/b",
         "--no-playlist",
         "--no-warnings",
         "-o", out_template,
