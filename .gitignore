@@ -1,0 +1,26 @@
+# PyInstaller build artifacts
+dist/
+build/
+*.spec.bak
+
+# Vendored binaries fetched at build time, not committed
+vendor/*.exe
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Local output GIFs (the user's collection, not source)
+gifs/
+out*.gif
+out*.mp4
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+*.stackdump
