@@ -84,6 +84,7 @@ class App(ctk.CTk):
 
         self._build_ui()
         self.last_outputs = None
+        self.share_window: "ShareWindow | None" = None
 
     def _build_ui(self) -> None:
         ctk.CTkLabel(
@@ -107,22 +108,31 @@ class App(ctk.CTk):
         self.name_var = ctk.StringVar()
         self.quality_var = ctk.StringVar(value="HD (720p, 24fps)")
 
-        self._field(form, "YouTube URL", self.url_var, row=0, colspan=2, placeholder="https://www.youtube.com/watch?v=...")
+        self.url_entry = self._field(form, "YouTube URL", self.url_var, row=0, colspan=2, placeholder="https://www.youtube.com/watch?v=...")
 
-        self._field(form, "Start", self.start_var, row=2, col=0, placeholder="e.g. 1:23")
-        self._field(form, "Duration (seconds)", self.duration_var, row=2, col=1, placeholder="e.g. 4")
+        self.start_entry = self._field(form, "Start", self.start_var, row=2, col=0, placeholder="e.g. 1:23")
+        self.duration_entry = self._field(form, "Duration (seconds)", self.duration_var, row=2, col=1, placeholder="e.g. 4")
 
-        self._field(form, "Name", self.name_var, row=4, colspan=2, placeholder="e.g. dog dancing")
+        self.name_entry = self._field(form, "Name", self.name_var, row=4, colspan=2, placeholder="e.g. dog dancing")
 
         ctk.CTkLabel(form, text="Quality", font=ctk.CTkFont(size=12)).grid(
             row=6, column=0, sticky="w", padx=16, pady=(12, 0)
         )
-        ctk.CTkOptionMenu(
+        self.quality_menu = ctk.CTkOptionMenu(
             form,
             values=["Standard (480p, 15fps)", "HD (720p, 24fps)"],
             variable=self.quality_var,
             width=240,
-        ).grid(row=7, column=0, columnspan=2, sticky="w", padx=16, pady=(2, 14))
+        )
+        self.quality_menu.grid(row=7, column=0, columnspan=2, sticky="w", padx=16, pady=(2, 14))
+
+        self._inputs = [
+            self.url_entry,
+            self.start_entry,
+            self.duration_entry,
+            self.name_entry,
+            self.quality_menu,
+        ]
 
         self.make_btn = ctk.CTkButton(
             self, text="Make GIF",
@@ -175,6 +185,11 @@ class App(ctk.CTk):
         )
         self.share_btn.pack(pady=(0, 20), padx=24, fill="x")
 
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        state = "normal" if enabled else "disabled"
+        for widget in self._inputs:
+            widget.configure(state=state)
+
     def _field(self, parent, label, var, row, col=0, colspan=1, placeholder=""):
         ctk.CTkLabel(parent, text=label, font=ctk.CTkFont(size=12)).grid(
             row=row, column=col, columnspan=colspan, sticky="w", padx=16, pady=(12, 0)
@@ -217,6 +232,7 @@ class App(ctk.CTk):
         self.open_btn.configure(state="disabled")
         self.open_gif_btn.configure(state="disabled")
         self.share_btn.configure(state="disabled")
+        self._set_inputs_enabled(False)
         self.outputs_label.configure(text="")
         self.status.configure(text="Starting…")
         self.progress.start()
@@ -256,12 +272,14 @@ class App(ctk.CTk):
         self.open_btn.configure(state="normal")
         self.open_gif_btn.configure(state="normal")
         self.share_btn.configure(state="normal")
+        self._set_inputs_enabled(True)
 
     def _on_failure(self, msg: str) -> None:
         self.progress.stop()
         self.progress.set(0)
         self.status.configure(text="Failed.")
         self.make_btn.configure(state="normal", text="Make GIF")
+        self._set_inputs_enabled(True)
         messagebox.showerror("Failed", msg)
 
     def open_output(self) -> None:
@@ -284,21 +302,27 @@ class App(ctk.CTk):
         if not self.last_outputs or not self.last_outputs.exists():
             messagebox.showerror("No GIF", "Make a GIF first.")
             return
+        # Singleton: if a share window is already open, bring it to the front
+        # instead of spinning up a second server and another window.
+        if self.share_window is not None and self.share_window.winfo_exists():
+            self.share_window.bring_to_front()
+            return
         try:
             session = serve_file(self.last_outputs)
         except OSError as e:
             messagebox.showerror("Network error", f"Could not start local server:\n{e}")
             return
-        ShareWindow(self, session)
+        self.share_window = ShareWindow(self, session)
 
 
 class ShareWindow(ctk.CTkToplevel):
-    def __init__(self, master: ctk.CTk, session: ShareSession) -> None:
+    def __init__(self, master: "App", session: ShareSession) -> None:
         super().__init__(master)
         self.title("Send to phone")
         self.geometry("420x600")
         self.resizable(False, False)
         self.session = session
+        self._app = master
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         ctk.CTkLabel(
@@ -332,10 +356,33 @@ class ShareWindow(ctk.CTkToplevel):
             command=self._on_close,
         ).pack(pady=(0, 16), padx=20, fill="x")
 
+        # Tie this popup to the parent so it always renders above the main window,
+        # and force it to the front (CTkToplevel can otherwise spawn behind parent
+        # on Windows). Done last so geometry is fully resolved before raising.
+        try:
+            self.transient(master)
+        except Exception:
+            pass
+        self.after(50, self.bring_to_front)
+
+    def bring_to_front(self) -> None:
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+            self.attributes("-topmost", True)
+            # Drop topmost after a moment so we don't stay always-on-top forever,
+            # but the user clearly sees the popup land above the main window.
+            self.after(400, lambda: self.attributes("-topmost", False))
+        except Exception:
+            pass
+
     def _on_close(self) -> None:
         try:
             self.session.stop()
         finally:
+            if getattr(self._app, "share_window", None) is self:
+                self._app.share_window = None
             self.destroy()
 
 
