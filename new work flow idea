@@ -1,0 +1,3 @@
+5. Skip drag-and-drop entirely with a "Send via Phone" flow. Run a tiny local HTTP server (Flask, ~30 lines) when the GIF finishes. Display a QR code in the GUI that points to http://<your-LAN-IP>:<port>/dog_dancing.gif. 
+Phone scans, downloads the actual file to camera roll, share-sheet to WhatsApp. No cloud upload, no Gmail, works offline on your home network. 
+This is probably the most elegant solution for your specific workflow — replaces the Gmail-as-transport hack with the same idea (use the phone) but without the round-trip latency.
