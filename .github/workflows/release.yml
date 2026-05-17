@@ -26,6 +26,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Run layout smoke test
+        shell: pwsh
+        run: pytest tests/ -v
+
       - name: Download ffmpeg.exe (Gyan essentials build)
         shell: pwsh
         run: |

@@ -74,7 +74,7 @@ class App(ctk.CTk):
         ctk.set_default_color_theme("blue")
 
         self.title("GIF Generator")
-        self.geometry("580x560")
+        self.geometry("580x680")
         self.resizable(False, False)
 
         self.ffmpeg = vendor_path("ffmpeg.exe")
