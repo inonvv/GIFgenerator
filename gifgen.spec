@@ -15,7 +15,11 @@ a = Analysis(
         ('vendor/ffmpeg.exe', 'vendor'),
         ('vendor/yt-dlp.exe', 'vendor'),
     ] + ctk_datas,
-    hiddenimports=[],
+    hiddenimports=[
+        'qrcode',
+        'qrcode.image.pil',
+        'PIL.Image',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

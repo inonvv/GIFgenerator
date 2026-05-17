@@ -10,8 +10,11 @@ from pathlib import Path
 from tkinter import messagebox
 
 import customtkinter as ctk
+import qrcode
+from PIL import Image
 
 from gifgen import make_gif
+from share_server import ShareSession, serve_file
 
 
 def vendor_path(name: str):
@@ -143,7 +146,17 @@ class App(ctk.CTk):
             state="disabled",
             command=self.open_output,
         )
-        self.open_btn.pack(pady=(12, 20), padx=24, fill="x")
+        self.open_btn.pack(pady=(12, 6), padx=24, fill="x")
+
+        self.share_btn = ctk.CTkButton(
+            self, text="Send to phone (QR)",
+            fg_color="transparent",
+            border_width=1,
+            corner_radius=10,
+            state="disabled",
+            command=self.open_share_window,
+        )
+        self.share_btn.pack(pady=(0, 20), padx=24, fill="x")
 
     def _field(self, parent, label, var, row, col=0, colspan=1, placeholder=""):
         ctk.CTkLabel(parent, text=label, font=ctk.CTkFont(size=12)).grid(
@@ -219,6 +232,7 @@ class App(ctk.CTk):
         self.outputs_label.configure(text=f"Saved: {self.last_outputs.name}")
         self.make_btn.configure(state="normal", text="Make GIF")
         self.open_btn.configure(state="normal")
+        self.share_btn.configure(state="normal")
 
     def _on_failure(self, msg: str) -> None:
         self.status.configure(text="Failed.")
@@ -231,6 +245,64 @@ class App(ctk.CTk):
             os.startfile(folder)
         except AttributeError:
             subprocess.Popen(["xdg-open", str(folder)])
+
+    def open_share_window(self) -> None:
+        if not self.last_outputs or not self.last_outputs.exists():
+            messagebox.showerror("No GIF", "Make a GIF first.")
+            return
+        try:
+            session = serve_file(self.last_outputs)
+        except OSError as e:
+            messagebox.showerror("Network error", f"Could not start local server:\n{e}")
+            return
+        ShareWindow(self, session)
+
+
+class ShareWindow(ctk.CTkToplevel):
+    def __init__(self, master: ctk.CTk, session: ShareSession) -> None:
+        super().__init__(master)
+        self.title("Send to phone")
+        self.geometry("420x600")
+        self.resizable(False, False)
+        self.session = session
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        ctk.CTkLabel(
+            self, text="Scan with your phone",
+            font=ctk.CTkFont(size=18, weight="bold"),
+        ).pack(pady=(20, 4))
+
+        ctk.CTkLabel(
+            self,
+            text="Phone must be on the same Wi-Fi.\nWindows may ask to allow the firewall — click Allow.",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray35", "gray65"),
+            justify="center",
+        ).pack(pady=(0, 12))
+
+        qr_img = qrcode.make(session.url)
+        pil_img = qr_img.get_image() if hasattr(qr_img, "get_image") else qr_img
+        pil_img = pil_img.convert("RGB").resize((320, 320), Image.NEAREST)
+        self._qr_photo = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(320, 320))
+
+        ctk.CTkLabel(self, image=self._qr_photo, text="").pack(pady=(0, 12))
+
+        url_box = ctk.CTkTextbox(self, height=44, width=360, font=ctk.CTkFont(size=11))
+        url_box.insert("1.0", session.url)
+        url_box.configure(state="disabled")
+        url_box.pack(pady=(0, 12), padx=20)
+
+        ctk.CTkButton(
+            self, text="Stop sharing",
+            corner_radius=10,
+            command=self._on_close,
+        ).pack(pady=(0, 16), padx=20, fill="x")
+
+    def _on_close(self) -> None:
+        try:
+            self.session.stop()
+        finally:
+            self.destroy()
 
 
 def main() -> None:
