@@ -48,6 +48,9 @@ def sanitize_name(name: str) -> str:
     return name or "clip"
 
 
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
+
 def try_update_ytdlp_async(ytdlp: str) -> None:
     def run():
         try:
@@ -56,6 +59,7 @@ def try_update_ytdlp_async(ytdlp: str) -> None:
                 timeout=30,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                creationflags=_NO_WINDOW,
             )
         except Exception:
             pass
@@ -129,8 +133,12 @@ class App(ctk.CTk):
         )
         self.make_btn.pack(pady=(20, 6), padx=24, fill="x")
 
+        self.progress = ctk.CTkProgressBar(self, mode="indeterminate", height=6)
+        self.progress.pack(pady=(8, 0), padx=24, fill="x")
+        self.progress.set(0)
+
         self.status = ctk.CTkLabel(self, text="Ready.", font=ctk.CTkFont(size=12))
-        self.status.pack(pady=(8, 0))
+        self.status.pack(pady=(6, 0))
 
         self.outputs_label = ctk.CTkLabel(
             self, text="", font=ctk.CTkFont(size=10),
@@ -138,15 +146,24 @@ class App(ctk.CTk):
         )
         self.outputs_label.pack(pady=(2, 0))
 
+        actions = ctk.CTkFrame(self, fg_color="transparent")
+        actions.pack(pady=(12, 6), padx=24, fill="x")
+        actions.grid_columnconfigure(0, weight=1)
+        actions.grid_columnconfigure(1, weight=1)
+
         self.open_btn = ctk.CTkButton(
-            self, text="Open output folder",
-            fg_color="transparent",
-            border_width=1,
-            corner_radius=10,
-            state="disabled",
-            command=self.open_output,
+            actions, text="Open folder",
+            fg_color="transparent", border_width=1, corner_radius=10,
+            state="disabled", command=self.open_output,
         )
-        self.open_btn.pack(pady=(12, 6), padx=24, fill="x")
+        self.open_btn.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+
+        self.open_gif_btn = ctk.CTkButton(
+            actions, text="Open GIF",
+            fg_color="transparent", border_width=1, corner_radius=10,
+            state="disabled", command=self.open_gif,
+        )
+        self.open_gif_btn.grid(row=0, column=1, sticky="ew", padx=(4, 0))
 
         self.share_btn = ctk.CTkButton(
             self, text="Send to phone (QR)",
@@ -198,8 +215,11 @@ class App(ctk.CTk):
         out_path = output_dir() / f"{sanitize_name(name)}.gif"
         self.make_btn.configure(state="disabled", text="Working…")
         self.open_btn.configure(state="disabled")
+        self.open_gif_btn.configure(state="disabled")
+        self.share_btn.configure(state="disabled")
         self.outputs_label.configure(text="")
         self.status.configure(text="Starting…")
+        self.progress.start()
         threading.Thread(
             target=self._run_job,
             args=(url, start, duration, out_path, fps, width),
@@ -228,13 +248,18 @@ class App(ctk.CTk):
         self.after(0, self._on_success)
 
     def _on_success(self) -> None:
+        self.progress.stop()
+        self.progress.set(0)
         self.status.configure(text="Done.")
         self.outputs_label.configure(text=f"Saved: {self.last_outputs.name}")
         self.make_btn.configure(state="normal", text="Make GIF")
         self.open_btn.configure(state="normal")
+        self.open_gif_btn.configure(state="normal")
         self.share_btn.configure(state="normal")
 
     def _on_failure(self, msg: str) -> None:
+        self.progress.stop()
+        self.progress.set(0)
         self.status.configure(text="Failed.")
         self.make_btn.configure(state="normal", text="Make GIF")
         messagebox.showerror("Failed", msg)
@@ -245,6 +270,15 @@ class App(ctk.CTk):
             os.startfile(folder)
         except AttributeError:
             subprocess.Popen(["xdg-open", str(folder)])
+
+    def open_gif(self) -> None:
+        if not self.last_outputs or not self.last_outputs.exists():
+            messagebox.showerror("No GIF", "Make a GIF first.")
+            return
+        try:
+            os.startfile(str(self.last_outputs))
+        except AttributeError:
+            subprocess.Popen(["xdg-open", str(self.last_outputs)])
 
     def open_share_window(self) -> None:
         if not self.last_outputs or not self.last_outputs.exists():

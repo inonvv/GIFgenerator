@@ -9,6 +9,8 @@ import sys
 import tempfile
 from typing import Callable, Optional
 
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 
 def positive_float(value: str) -> float:
     n = float(value)
@@ -41,7 +43,7 @@ def download_source(page_url: str, tmpdir: str, ytdlp: Optional[str] = None, ffm
     if ffmpeg:
         cmd += ["--ffmpeg-location", ffmpeg]
     cmd.append(page_url)
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, creationflags=_NO_WINDOW)
 
     files = [f for f in os.listdir(tmpdir) if f.startswith("src.")]
     if not files:
@@ -62,7 +64,7 @@ def _slice_to_mp4(src: str, start: str, duration: float, out: str, fps: int, wid
         "-an",
         out,
     ]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, creationflags=_NO_WINDOW)
 
 
 def _mp4_to_gif(src: str, duration: float, out: str, fps: int, width: int, ffmpeg: Optional[str] = None) -> None:
@@ -78,7 +80,7 @@ def _mp4_to_gif(src: str, duration: float, out: str, fps: int, width: int, ffmpe
         "-loop", "0",
         out,
     ]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, creationflags=_NO_WINDOW)
 
 
 def make_gif(
